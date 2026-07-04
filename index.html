@@ -1,161 +1,161 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RSI Extremes Tracker - Bitget Futures</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
-  <style>
-    body { background: #0a0f1c; color: #e0f2fe; }
-    .card { background: #111827; border: 1px solid #334155; }
-    .short { background: #7f1d1d; border-color: #ef4444; }
-    .long { background: #14532d; border-color: #22c55e; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RSI Heatmap PRO</title>
+<script src="https://cdn.tailwindcss.com"></script>
+
+<style>
+body { background:#0a0f1c; color:#e0f2fe; }
+.card { background:#111827; border:1px solid #334155; }
+</style>
 </head>
-<body class="min-h-screen p-6">
-  <div class="max-w-6xl mx-auto">
-    <h1 class="text-3xl font-bold text-center mb-8 text-cyan-400">
-      RSI Extremes Tracker <span class="text-lg text-slate-400">(Bitget Futures 15m)</span>
-    </h1>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <!-- Control -->
-      <div class="card p-6 rounded-2xl">
-        <h2 class="text-xl font-semibold mb-4">Configuración</h2>
-        <div class="space-y-4">
-          <div>
-            <label class="text-sm text-slate-400">Umbral Short</label>
-            <input id="shortThreshold" type="number" value="85" class="w-full bg-slate-900 border border-red-500 rounded-lg px-4 py-3 text-center text-2xl font-bold">
-          </div>
-          <div>
-            <label class="text-sm text-slate-400">Umbral Long</label>
-            <input id="longThreshold" type="number" value="15" class="w-full bg-slate-900 border border-emerald-500 rounded-lg px-4 py-3 text-center text-2xl font-bold">
-          </div>
-          <button onclick="startTracking()" class="w-full bg-emerald-600 hover:bg-emerald-500 py-4 rounded-2xl font-bold text-lg">
-            INICIAR MONITOREO
-          </button>
-          <button onclick="stopTracking()" class="w-full bg-red-600 hover:bg-red-500 py-4 rounded-2xl font-bold text-lg">
-            DETENER
-          </button>
-        </div>
-      </div>
+<body class="p-6">
 
-      <!-- Stats -->
-      <div class="card p-6 rounded-2xl md:col-span-2">
-        <h2 class="text-xl font-semibold mb-4 text-amber-400">Últimos Extremos Detectados</h2>
-        <div id="logBody" class="space-y-3 max-h-[520px] overflow-y-auto pr-2"></div>
-      </div>
-    </div>
-  </div>
+<div class="max-w-6xl mx-auto">
 
-  <script>
-    let intervalId = null;
-    let logs = [];
+<h1 class="text-2xl font-bold text-center text-cyan-400 mb-6">
+RSI Heatmap PRO (Event Based)
+</h1>
 
-    const symbols = ['SOLUSDT', 'BTCUSDT', 'ETHUSDT', 'DOGEUSDT', 'XRPUSDT', 'TONUSDT', 'ADAUSDT', 'AVAXUSDT'];
+<div class="card p-4 rounded-xl mb-6 text-center">
+<button onclick="start()" class="bg-green-600 px-6 py-2 rounded-xl font-bold">START</button>
+<button onclick="stop()" class="bg-red-600 px-6 py-2 rounded-xl font-bold ml-2">STOP</button>
+</div>
 
-    async function getFuturesRSI(symbol) {
-      try {
-        const url = https://api.bitget.com/api/v2/mix/market/candles?symbol=${symbol}_USDT&granularity=15m&limit=100;
-        const res = await fetch(url);
-        const json = await res.json();
-        
-        if (!json.data) return null;
+<div class="card p-4 rounded-xl mb-6">
+<h2 class="text-cyan-300 mb-3">Heatmap 24H</h2>
+<div id="heatmap" class="grid grid-cols-6 md:grid-cols-12 gap-2"></div>
+</div>
 
-        let closes = json.data.map(c => parseFloat(c[4]));
-        if (closes.length < 20) return null;
+<div class="card p-4 rounded-xl">
+<h2 class="text-amber-300 mb-3">Eventos</h2>
+<div id="log" class="space-y-2 max-h-96 overflow-y-auto"></div>
+</div>
 
-        let gains = 0, losses = 0;
-        for (let i = 1; i < closes.length; i++) {
-          let diff = closes[i] - closes[i-1];
-          if (diff > 0) gains += diff;
-          else losses -= diff;
-        }
+</div>
 
-        let avgGain = gains / 14;
-        let avgLoss = losses / 14;
-        let rs = avgGain / avgLoss || 0;
-        let rsi = 100 - (100 / (1 + rs));
+<script>
 
-        return {
-          rsi: Math.round(rsi * 10) / 10,
-          price: closes[closes.length-1]
-        };
-      } catch(e) {
-        return null;
+let interval = null;
+
+// 24h stats
+let stats = Array.from({length:24}, () => ({
+  total:0,
+  short:0,
+  long:0
+}));
+
+// control de estado (ESTO ES EL MODO PRO)
+let state = {};
+
+let logs = [];
+
+const symbols = ["BTC","ETH","SOL","DOGE","XRP","ADA","BNB"];
+
+// SIMULACIÓN RSI (luego lo conectas a Bitget)
+function fakeRSI(){
+  return Math.random()*100;
+}
+
+function scan(){
+
+  const hour = new Date().getUTCHours();
+
+  symbols.forEach(sym => {
+
+    const rsi = fakeRSI();
+
+    let type = null;
+    if(rsi >= 85) type = "SHORT";
+    if(rsi <= 15) type = "LONG";
+
+    const prev = state[sym];
+
+    // 🔥 SOLO CUENTA SI ENTRA A ZONA
+    if(type){
+
+      if(prev !== type){
+
+        stats[hour].total++;
+        type === "SHORT" ? stats[hour].short++ : stats[hour].long++;
+
+        logs.unshift({
+          sym,
+          rsi: rsi.toFixed(1),
+          type,
+          hour
+        });
+
+        if(logs.length > 80) logs.pop();
       }
+
+      state[sym] = type;
+
+    } else {
+      state[sym] = null;
     }
 
-    async function scan() {
-      for (let sym of symbols) {
-        const data = await getFuturesRSI(sym);
-        if (!data) continue;
+  });
 
-        const shortThresh = parseFloat(document.getElementById('shortThreshold').value) || 85;
-        const longThresh = parseFloat(document.getElementById('longThreshold').value) || 15;
+  render();
+}
 
-        let type = null;
-        if (data.rsi >= shortThresh) type = 'SHORT';
-        else if (data.rsi <= longThresh) type = 'LONG';
+function render(){
 
-        if (type) {
-          const now = new Date();
-          const entry = {
-            time: now.toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'}),
-            hour: now.getUTCHours().toString().padStart(2,'0') + ":00 UTC",
-            symbol: sym.replace('USDT','/USDT'),
-            rsi: data.rsi,
-            price: data.price.toFixed(4),
-            type: type,
-            date: now.toLocaleDateString('es-ES')
-          };
+  const heatmap = document.getElementById("heatmap");
+  heatmap.innerHTML = "";
 
-          logs.unshift(entry);
-          if (logs.length > 100) logs.pop();
+  const max = Math.max(...stats.map(s => s.total)) || 1;
 
-          renderLogs();
-        }
-      }
-    }
+  stats.forEach((s,i)=>{
 
-    function renderLogs() {
-      const container = document.getElementById('logBody');
-      container.innerHTML = '';
+    const intensity = s.total / max;
+    const color = `rgba(239,68,68,${intensity})`;
 
-      logs.forEach(log => {
-        const div = document.createElement('div');
-        div.className = flex justify-between items-center p-4 rounded-xl ${log.type === 'SHORT' ? 'short' : 'long'};
-        div.innerHTML = 
-          <div>
-            <span class="font-mono text-lg">${log.hour}</span><br>
-            <span class="font-bold">${log.symbol}</span>
-          </div>
-          <div class="text-right">
-            <div class="text-2xl font-bold">${log.rsi}</div>
-            <div class="text-xs text-slate-400">${log.price}</div>
-          </div>
-          <div class="text-3xl font-black ${log.type === 'SHORT' ? 'text-red-400' : 'text-emerald-400'}">
-            ${log.type}
-          </div>
-        ;
-        container.appendChild(div);
-      });
-    }
+    const div = document.createElement("div");
+    div.className = "p-2 text-center rounded-lg text-xs border border-slate-700";
+    div.style.background = color;
 
-    function startTracking() {
-      if (intervalId) clearInterval(intervalId);
-      scan();
-      intervalId = setInterval(scan, 900000); // 15 minutos
-      document.getElementById('status').innerHTML = '🟢 MONITOREANDO FUTUROS BITGET';
-    }
+    div.innerHTML = `
+      <div>${i}:00</div>
+      <div class="font-bold">${s.total}</div>
+      <div class="text-[10px]">S:${s.short} L:${s.long}</div>
+    `;
 
-    function stopTracking() {
-      if (intervalId) clearInterval(intervalId);
-      document.getElementById('status').innerHTML = '🔴 DETENIDO';
-    }
+    heatmap.appendChild(div);
+  });
 
-    window.onload = startTracking;
-  </script>
+  const log = document.getElementById("log");
+  log.innerHTML = "";
+
+  logs.forEach(l=>{
+    const div = document.createElement("div");
+    div.className = "p-2 rounded bg-slate-900 flex justify-between";
+
+    div.innerHTML = `
+      <span>${l.hour}:00 ${l.sym}</span>
+      <span>${l.rsi} ${l.type}</span>
+    `;
+
+    log.appendChild(div);
+  });
+
+}
+
+function start(){
+  if(interval) clearInterval(interval);
+  scan();
+  interval = setInterval(scan, 5000);
+}
+
+function stop(){
+  clearInterval(interval);
+}
+
+</script>
+
 </body>
-</html> este código es para registro de horas de rsi extremo en bigget esta bien que opina s  
+</html>

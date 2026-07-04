@@ -1,154 +1,64 @@
 <!DOCTYPE html>
-<html lang="es">
+<html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>RSI Heatmap PRO</title>
+<title>RSI Heatmap</title>
 <script src="https://cdn.tailwindcss.com"></script>
-
-<style>
-body { background:#0a0f1c; color:#e0f2fe; }
-.card { background:#111827; border:1px solid #334155; }
-</style>
 </head>
 
-<body class="p-6">
+<body style="background:#0a0f1c;color:white;padding:20px">
 
-<div class="max-w-6xl mx-auto">
-
-<h1 class="text-2xl font-bold text-center text-cyan-400 mb-6">
-RSI Heatmap PRO (Event Based)
+<h1 style="color:#22d3ee;text-align:center">
+RSI Heatmap PRO
 </h1>
 
-<div class="card p-4 rounded-xl mb-6 text-center">
-<button onclick="start()" class="bg-green-600 px-6 py-2 rounded-xl font-bold">START</button>
-<button onclick="stop()" class="bg-red-600 px-6 py-2 rounded-xl font-bold ml-2">STOP</button>
-</div>
+<button onclick="start()">START</button>
+<button onclick="stop()">STOP</button>
 
-<div class="card p-4 rounded-xl mb-6">
-<h2 class="text-cyan-300 mb-3">Heatmap 24H</h2>
-<div id="heatmap" class="grid grid-cols-6 md:grid-cols-12 gap-2"></div>
-</div>
-
-<div class="card p-4 rounded-xl">
-<h2 class="text-amber-300 mb-3">Eventos</h2>
-<div id="log" class="space-y-2 max-h-96 overflow-y-auto"></div>
-</div>
-
-</div>
+<h2>Heatmap</h2>
+<div id="map" style="display:grid;grid-template-columns:repeat(6,1fr);gap:5px"></div>
 
 <script>
 
-let interval = null;
-
-// 24h stats
-let stats = Array.from({length:24}, () => ({
-  total:0,
-  short:0,
-  long:0
-}));
-
-// control de estado (ESTO ES EL MODO PRO)
-let state = {};
-
-let logs = [];
-
-const symbols = ["BTC","ETH","SOL","DOGE","XRP","ADA","BNB"];
-
-// SIMULACIÓN RSI (luego lo conectas a Bitget)
-function fakeRSI(){
-  return Math.random()*100;
-}
+let stats = Array.from({length:24},()=>0);
+let interval;
 
 function scan(){
+  let hour = new Date().getUTCHours();
 
-  const hour = new Date().getUTCHours();
-
-  symbols.forEach(sym => {
-
-    const rsi = fakeRSI();
-
-    let type = null;
-    if(rsi >= 85) type = "SHORT";
-    if(rsi <= 15) type = "LONG";
-
-    const prev = state[sym];
-
-    // 🔥 SOLO CUENTA SI ENTRA A ZONA
-    if(type){
-
-      if(prev !== type){
-
-        stats[hour].total++;
-        type === "SHORT" ? stats[hour].short++ : stats[hour].long++;
-
-        logs.unshift({
-          sym,
-          rsi: rsi.toFixed(1),
-          type,
-          hour
-        });
-
-        if(logs.length > 80) logs.pop();
-      }
-
-      state[sym] = type;
-
-    } else {
-      state[sym] = null;
-    }
-
-  });
+  // simulación segura
+  if(Math.random() > 0.7){
+    stats[hour]++;
+  }
 
   render();
 }
 
 function render(){
+  const map = document.getElementById("map");
+  map.innerHTML = "";
 
-  const heatmap = document.getElementById("heatmap");
-  heatmap.innerHTML = "";
+  let max = Math.max(...stats) || 1;
 
-  const max = Math.max(...stats.map(s => s.total)) || 1;
+  for(let i=0;i<24;i++){
 
-  stats.forEach((s,i)=>{
+    let intensity = stats[i]/max;
+    let color = `rgba(239,68,68,${intensity})`;
 
-    const intensity = s.total / max;
-    const color = `rgba(239,68,68,${intensity})`;
-
-    const div = document.createElement("div");
-    div.className = "p-2 text-center rounded-lg text-xs border border-slate-700";
+    let div = document.createElement("div");
     div.style.background = color;
+    div.style.padding = "10px";
+    div.style.textAlign = "center";
 
-    div.innerHTML = `
-      <div>${i}:00</div>
-      <div class="font-bold">${s.total}</div>
-      <div class="text-[10px]">S:${s.short} L:${s.long}</div>
-    `;
+    div.innerHTML = i + ":00<br>" + stats[i];
 
-    heatmap.appendChild(div);
-  });
-
-  const log = document.getElementById("log");
-  log.innerHTML = "";
-
-  logs.forEach(l=>{
-    const div = document.createElement("div");
-    div.className = "p-2 rounded bg-slate-900 flex justify-between";
-
-    div.innerHTML = `
-      <span>${l.hour}:00 ${l.sym}</span>
-      <span>${l.rsi} ${l.type}</span>
-    `;
-
-    log.appendChild(div);
-  });
-
+    map.appendChild(div);
+  }
 }
 
 function start(){
   if(interval) clearInterval(interval);
-  scan();
-  interval = setInterval(scan, 5000);
+  interval = setInterval(scan,2000);
 }
 
 function stop(){
